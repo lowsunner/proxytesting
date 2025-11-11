@@ -109,56 +109,46 @@ function isUrl(val = "") {
 
 // open url function - use the EXACT working version from old index.js
 function openURL(url) {
-    window.navigator.serviceWorker
-    .register("./uv.js", {
-      scope: __uv$config.prefix,
-    })
-    .then(() => {
-      if (!isUrl(url)) url = getSearchEngineURL() + url;
-      else if (!(url.startsWith("https://") || url.startsWith("http://")))
+    // Make sure it’s a full URL
+    if (!isUrl(url)) url = getSearchEngineURL() + url;
+    else if (!(url.startsWith("https://") || url.startsWith("http://")))
         url = "http://" + url;
 
-      if (getAboutBlank() === 'on') {
-        openAboutBlank(window.location.href.slice(0, -1) + __uv$config.prefix + __uv$config.encodeUrl(url));
-      } else {
-        window.location.href = __uv$config.prefix + __uv$config.encodeUrl(url);
-      }
-    });
-};
+    // Encode URL using UV encode function
+    const encoded = __uv$config.encodeUrl(url);
+
+    // Redirect to Cloudflare Function
+    window.location.href = '/service?url=' + encoded;
+}
+
 
 // Search function
 // Search function - use the EXACT working version from old index.js
 function performSearch(engine, query) {
-    window.navigator.serviceWorker
-    .register("./uv.js", {
-      scope: __uv$config.prefix,
-    })
-    .then(() => {
-      let searchURL;
-      switch(engine) {
-          case 'Google':
-              searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-              break;
-          case 'Brave Search':
-              searchURL = `https://search.brave.com/search?q=${encodeURIComponent(query)}`;
-              break;
-          case 'DuckDuckGo':
-              searchURL = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
-              break;
-          case 'Bing':
-              searchURL = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-              break;
-          default:
-              searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-      }
-      
-      if (getAboutBlank() === 'on') {
-          openAboutBlank(window.location.href.slice(0, -1) + __uv$config.prefix + __uv$config.encodeUrl(searchURL));
-      } else {
-          window.location.href = __uv$config.prefix + __uv$config.encodeUrl(searchURL);
-      }
-    });
+    let searchURL;
+    switch(engine) {
+        case 'Google':
+            searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+            break;
+        case 'Brave Search':
+            searchURL = `https://search.brave.com/search?q=${encodeURIComponent(query)}`;
+            break;
+        case 'DuckDuckGo':
+            searchURL = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+            break;
+        case 'Bing':
+            searchURL = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+            break;
+        default:
+            searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    }
+
+    const encoded = __uv$config.encodeUrl(searchURL);
+
+    // Redirect via Cloudflare Function
+    window.location.href = '/service?url=' + encoded;
 }
+
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register(window.location.origin + "/js/sw.js");
   }

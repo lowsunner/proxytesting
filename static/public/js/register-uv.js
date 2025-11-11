@@ -3,6 +3,7 @@
  * Global util
  * Used in index.html
  */
+//
 async function registerSW() {
   if (!navigator.serviceWorker)
     throw new Error("Your browser doesn't support service workers.");

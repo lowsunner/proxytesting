@@ -1,4 +1,4 @@
-import { Ultraviolet } from '/static/public/js/uv/uv.bundle.js'; // adjust path if needed
+import { Ultraviolet } from './static/public/js/uv/uv.bundle.js'; // adjust path if needed
 
 export async function onRequest(context) {
   const { request } = context;

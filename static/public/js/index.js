@@ -1,14 +1,73 @@
-const form = document.querySelector("form");
-const input = document.getElementById("searchInput");
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+});
 
-// start of password protection
-if (getPassword() == null) {
-    openPage('home');
-} else {
-    openPage('password');
-    document.getElementById('sidebar').style.display = 'none';
+function initializeApp() {
+    // Initialize navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const page = this.getAttribute('data-page');
+            openPage(page);
+            setActiveNav(page);
+        });
+    });
+
+    // Initialize search engines
+    document.querySelectorAll('.engine').forEach(engine => {
+        engine.addEventListener('click', function() {
+            document.querySelectorAll('.engine').forEach(e => e.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+
+    // Initialize search functionality
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const query = this.value.trim();
+                if (query) {
+                    const selectedEngine = document.querySelector('.engine.active');
+                    const engine = selectedEngine ? selectedEngine.getAttribute('data-engine') : 'Google';
+                    performSearch(engine, query);
+                }
+            }
+        });
+    }
+
+    // Initialize shortcuts
+    document.querySelectorAll('.shortcut').forEach(shortcut => {
+        const url = shortcut.getAttribute('data-url');
+        if (url) {
+            shortcut.addEventListener('click', function() {
+                openURL(url);
+            });
+        }
+    });
+
+    // Initialize custom shortcut
+    setupCustomShortcut();
+
+    // Start of password protection
+    if (getPassword() == null) {
+        openPage('home');
+        setActiveNav('home');
+    } else {
+        openPage('password');
+        const topNav = document.querySelector('.top-nav');
+        if (topNav) topNav.style.display = 'none';
+    }
+
+    // Load settings
+    loadSettings();
+    setupCloak();
+    showAnnouncement();
 }
 
+  
+// Password functions
 function getPassword() {
     return localStorage.getItem('password') || null;
 }
@@ -17,12 +76,13 @@ function setPassword() {
     const $password = document.getElementById('password-set');
     const password = $password.value;
     if (password == null || password == '') {
-        alert('Removed password');
+        showNotification('Removed password');
         localStorage.removeItem('password');
         return;
     }
     if (confirm("Are you sure you want to password protect this page? If you do, you will not be able to access this page without the password. If you do not want to password protect this page, click cancel.") == true) {
         localStorage.setItem('password', password);
+        showNotification('Password set successfully!');
     }
 }
 
@@ -31,40 +91,23 @@ function checkPassword() {
     const password = $password.value;
     if (password == getPassword()) {
         openPage('home');
-        document.getElementById('sidebar').style.display = 'flex';
+        setActiveNav('home');
+        const topNav = document.querySelector('.top-nav');
+        if (topNav) topNav.style.display = 'flex';
+        showNotification('Password accepted!');
     } else {
-        window.location.href = getSearchEngineURL();
+        showNotification('Incorrect password!');
     }
 }
 
-function togglePassword() {
-    var x = document.getElementById("passwordToggle");
-    if (x.type === "password") {
-        x.type = "text";
-    } else {
-        x.type = "password";
-    }
-}
-
-// end of password protection
-
-form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    let url = input.value.trim();
-    openURL(url);
-  });
-  
+// URL functions
 function isUrl(val = "") {
-    if (
-        /^http(s?):\/\//.test(val) ||
-        (val.includes(".") && val.substr(0, 1) !== " ")
-    )
+    if (/^http(s?):\/\//.test(val) || (val.includes(".") && val.substr(0, 1) !== " "))
         return true;
     return false;
 }
-  
 
-// open url function
+// open url function - use the EXACT working version from old index.js
 function openURL(url) {
     window.navigator.serviceWorker
     .register("./uv.js", {
@@ -83,314 +126,289 @@ function openURL(url) {
     });
 };
 
-selectedIcon('icon-home');
+// Search function
+// Search function - use the EXACT working version from old index.js
+function performSearch(engine, query) {
+    window.navigator.serviceWorker
+    .register("./uv.js", {
+      scope: __uv$config.prefix,
+    })
+    .then(() => {
+      let searchURL;
+      switch(engine) {
+          case 'Google':
+              searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+              break;
+          case 'Brave Search':
+              searchURL = `https://search.brave.com/search?q=${encodeURIComponent(query)}`;
+              break;
+          case 'DuckDuckGo':
+              searchURL = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+              break;
+          case 'Bing':
+              searchURL = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+              break;
+          default:
+              searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      }
+      
+      if (getAboutBlank() === 'on') {
+          openAboutBlank(window.location.href.slice(0, -1) + __uv$config.prefix + __uv$config.encodeUrl(searchURL));
+      } else {
+          window.location.href = __uv$config.prefix + __uv$config.encodeUrl(searchURL);
+      }
+    });
+}
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register(window.location.origin + "/js/sw.js");
+  }
+// Service Worker registration
 
-setupCloak();
 
-if (getAboutBlank() === 'on') {
-    openPage('search');
-    selectedIcon('icon-search');
+// Navigation functions
+function openPage(page) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => {
+        p.style.display = 'none';
+    });
+    
+    // Show the selected page
+    const pageElement = document.getElementById(page);
+    if (pageElement) {
+        pageElement.style.display = 'flex';
+    }
+    
+    // Update footer visibility
+    const footer = document.getElementById('footer');
+    if (footer) {
+        footer.style.display = (page === 'settings' || page === 'password') ? 'none' : 'block';
+    }
+    
+    // Focus search input if on search page
+    if (page === 'search') {
+        setTimeout(() => {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.value = '';
+            }
+        }, 100);
+    }
 }
 
-setupCustomShortcut();
+function setActiveNav(page) {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    const activeNav = document.querySelector(`.nav-item[data-page="${page}"]`);
+    if (activeNav) {
+        activeNav.classList.add('active');
+    }
+}
 
-const $searchSelect = document.getElementById('searchSelect');
-$searchSelect.value = getSearchEngine();
+// Settings functions
+function loadSettings() {
+    // Search engine
+    const savedEngine = localStorage.getItem('searchEngine') || 'Google';
+    const searchSelect = document.getElementById('searchSelect');
+    if (searchSelect) searchSelect.value = savedEngine;
 
-const $analyticsSelect = document.getElementById('analyticsSelect');
-$analyticsSelect.value = getAnalytics();
+    // Analytics
+    const analytics = localStorage.getItem('analytics') || 'off';
+    const analyticsSelect = document.getElementById('analyticsSelect');
+    if (analyticsSelect) analyticsSelect.value = analytics;
 
-const $aboutBlankSelect = document.getElementById('aboutBlankSelect');
-$aboutBlankSelect.value = getAboutBlank();
+    // About:blank
+    const aboutBlank = localStorage.getItem('aboutBlank') || 'off';
+    const aboutBlankSelect = document.getElementById('aboutBlankSelect');
+    if (aboutBlankSelect) aboutBlankSelect.value = aboutBlank;
 
-// Check their preferred search engine
-function getSearchEngine () {
+    // Set active search engine in UI
+    const engines = document.querySelectorAll('.engine');
+    engines.forEach(engine => {
+        if (engine.getAttribute('data-engine') === savedEngine) {
+            engine.classList.add('active');
+        } else {
+            engine.classList.remove('active');
+        }
+    });
+}
+
+function getSearchEngine() {
     return localStorage.getItem('searchEngine') || 'Google';
 }
 
-// start of anaylitics functions
-
-function getAnalytics() {
-    return localStorage.getItem('analytics') || 'on';
-}
-
-function setAnalytics() {
-    const $analyticsSelect = document.getElementById('analyticsSelect');
-    const analyticsPref = $analyticsSelect.value;
-    if (analyticsPref === 'on') {
-        localStorage.setItem('analytics', 'on');
-    } else if (analyticsPref === 'off') {
-        localStorage.setItem('analytics', 'off');
+function setSearchEngine() {
+    const searchSelect = document.getElementById('searchSelect');
+    const searchEngine = searchSelect.value;
+    
+    switch(searchEngine) {
+        case 'Google':
+            localStorage.setItem('searchEngineURL', 'https://google.com/search?q=');
+            break;
+        case 'DuckDuckGo':
+            localStorage.setItem('searchEngineURL', 'https://duckduckgo.com/?q=');
+            break;
+        case 'Bing':
+            localStorage.setItem('searchEngineURL', 'https://bing.com/search?q=');
+            break;
+        case 'Brave Search':
+            localStorage.setItem('searchEngineURL', 'https://search.brave.com/search?q=');
+            break;
     }
-    location.reload();
+    localStorage.setItem('searchEngine', searchEngine);
+    showNotification(`Search engine set to ${searchEngine}`);
+    
+    // Update UI
+    loadSettings();
 }
 
-// analytics (change it if you want to enable it)
-if(localStorage.getItem('analytics') != 'off') {
-    var scriptTagGTAG = document.createElement('script');
-    scriptTagGTAG.setAttribute('async', '');
-    scriptTagGTAG.setAttribute('src', 'https://www.googletagmanager.com/gtag/js?id=G-CX3B4NHEG0');
-    document.head.appendChild(scriptTagGTAG);
-    // gtag
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments)};
-    gtag('js', new Date());
-
-    gtag('config', 'G-CX3B4NHEG0');
-
-    // arc
-    var scriptTagARC = document.createElement('script');
-    scriptTagARC.setAttribute('async', '');
-    scriptTagARC.setAttribute('src', 'https://arc.io/widget.min.js#85sFzH5m');
-    document.head.appendChild(scriptTagARC);
-}
-
-// end of anaylitics functions
-
-// Set their preferred search engine
-function setSearchEngine () {
-    const $searchSelect = document.getElementById('searchSelect');
-    const searchEngine = $searchSelect.value;
-    if (searchEngine === 'Google') {
-        localStorage.setItem('searchEngineURL', 'https://google.com/search?q=');
-        localStorage.setItem('searchEngine', 'Google');
-    } else if (searchEngine === 'DuckDuckGo') {
-        localStorage.setItem('searchEngineURL', 'https://duckduckgo.com/?q=');
-        localStorage.setItem('searchEngine', 'DuckDuckGo');
-    } else if (searchEngine === 'Bing') {
-        localStorage.setItem('searchEngineURL', 'https://bing.com/search?q=');
-        localStorage.setItem('searchEngine', 'Bing');
-    } else if (searchEngine === 'Brave Search') {
-        localStorage.setItem('searchEngineURL', 'https://search.brave.com/search?q=');
-        localStorage.setItem('searchEngine', 'Brave Search');
-    }
-}
-
-// get search engine url
 function getSearchEngineURL() {
     return localStorage.getItem('searchEngineURL') || 'https://google.com/search?q=';
 }
 
-// Start of about:blank functions
+// Analytics functions (simplified - arc.io removed)
+function getAnalytics() {
+    return localStorage.getItem('analytics') || 'off';
+}
 
+function setAnalytics() {
+    const analyticsSelect = document.getElementById('analyticsSelect');
+    const analyticsPref = analyticsSelect.value;
+    localStorage.setItem('analytics', analyticsPref);
+    showNotification(`Analytics ${analyticsPref}`);
+}
+
+// About:blank functions
 function getAboutBlank() {
-    if (localStorage.getItem('aboutBlank') === 'on') {
-        var introText = document.getElementById("introText");
-        introText.innerHTML = "<b>Elixir:</b><br>Search the web without censorship or tracking.</a>"
-
-        var searchPlaceholder = document.querySelector("input");
-        searchPlaceholder.placeholder = "Search here without tracking";
-
-        return 'on';
-    } else {
-        return 'off';
-    }
+    return localStorage.getItem('aboutBlank') || 'off';
 }
 
-// Opens page in a new about:blank tab
 function setAboutBlank() {
-    const $aboutBlankSelect = document.getElementById('aboutBlankSelect');
-    const aboutBlankSelect = $aboutBlankSelect.value;
-    if (aboutBlankSelect === 'on') {
-        localStorage.setItem('aboutBlank', 'on');
-        openAboutBlank();
-    } else if (aboutBlankSelect === 'off') {
-        localStorage.setItem('aboutBlank', 'off');
-    }
+    const aboutBlankSelect = document.getElementById('aboutBlankSelect');
+    const aboutBlankPref = aboutBlankSelect.value;
+    localStorage.setItem('aboutBlank', aboutBlankPref);
+    showNotification(`about:blank ${aboutBlankPref}`);
 }
 
-// opens page in about:blank
 function openAboutBlank(url) {
-    if (url === undefined) {
-      var encoded_url = window.location.origin;
+    if (!url) {
+        url = window.location.origin;
     }
-    else {
-      var encoded_url = url;
-    }
-    var w = open('about:blank', '_blank') || alert("It seems like you are blocking pop-ups. Please try again once you have allowed pop-ups.")
-      w.document.write(`<iframe style="height: 100%; width: 100%; border: none;" src="${encoded_url}" allowfullscreen></iframe>`)
-      w.document.body.style.margin = '0'
-    window.location.replace(getSearchEngineURL()); 
-}
-// end of about:blank functions
-
-// changes the selected icon
-function selectedIcon(icon) {
-    const icons = document.querySelectorAll(`[id^="icon"]`);
-    icons.forEach(element =>{
-        element.classList.remove('sidebar-icon-selected');
-    });
-    document.getElementById(icon).classList.toggle('sidebar-icon-selected')
-}
-
-// opens a certain page using css and hides the others
-function openPage(page) {
-    if (page === 'home') {
-        document.getElementById("search").style.display = "none";
-        document.getElementById("settings").style.display = "none";
-        document.getElementById("home").style.display = "flex";
-        document.getElementById("footer").style.display = "block";
-        document.getElementById("password").style.display = "none";
-    } else if (page === 'search') {
-        document.getElementById("home").style.display = "none";
-        document.getElementById("settings").style.display = "none";
-        document.getElementById("search").style.display = "flex";
-        document.getElementById("footer").style.display = "block";
-        document.getElementById("password").style.display = "none";
-    } else if (page === 'settings') {
-        document.getElementById("home").style.display = "none";
-        document.getElementById("search").style.display = "none";
-        document.getElementById("settings").style.display = "flex";
-        document.getElementById("footer").style.display = "none";
-        document.getElementById("password").style.display = "none";
-    } else if (page === 'password') {
-        document.getElementById("home").style.display = "none";
-        document.getElementById("search").style.display = "none";
-        document.getElementById("settings").style.display = "none";
-        document.getElementById("footer").style.display = "none";
-        document.getElementById("password").style.display = "flex";
+    const w = window.open('about:blank', '_blank');
+    if (w) {
+        w.document.write(`<iframe style="height: 100%; width: 100%; border: none;" src="${url}" allowfullscreen></iframe>`);
+        w.document.body.style.margin = '0';
+    } else {
+        showNotification("Please allow pop-ups to use about:blank");
     }
 }
 
-// sets the custom shortcut
+// Custom shortcut functions
 function setCustomShortcut() {
-    const $shortcutURL = document.getElementById('shortcutURL');
-    const $shortcutLogo = document.getElementById('shortcutLogo');
+    const shortcutURL = document.getElementById('shortcutURL');
+    const shortcutLogo = document.getElementById('shortcutLogo');
 
-    if ($shortcutURL.value === '' && $shortcutLogo.value === '') {
-        alert('Cleared custom shortcut');
+    if (!shortcutURL.value && !shortcutLogo.value) {
         localStorage.removeItem('shortcutURL');
         localStorage.removeItem('shortcutLogo');
-        setupCustomShortcut();
-    } else if ($shortcutURL.value === '' || $shortcutLogo.value === '') {
-        alert('Please fill out both fields');
+        showNotification('Custom shortcut cleared');
+    } else if (!shortcutURL.value || !shortcutLogo.value) {
+        showNotification('Please fill out both fields');
+        return;
     } else {
-        if ($shortcutURL.value.match(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi)) {
-            localStorage.setItem('shortcutURL', $shortcutURL.value);
-            localStorage.setItem('shortcutLogo', $shortcutLogo.value.charAt(0));
-            alert('Shortcut set!');
-            setupCustomShortcut();
+        if (shortcutURL.value.match(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi)) {
+            localStorage.setItem('shortcutURL', shortcutURL.value);
+            localStorage.setItem('shortcutLogo', shortcutLogo.value.charAt(0));
+            showNotification('Custom shortcut set!');
         } else {
-            alert('Please enter a valid URL');
+            showNotification('Please enter a valid URL');
+            return;
         }
     }
+    setupCustomShortcut();
 }
 
-// changes the text on the custom shortcut and changes the onclick function to open the shortcut url
 function setupCustomShortcut() {
-    if (localStorage.getItem('shortcutURL') != null) {
-        document.getElementById('customShortcutIcon').innerHTML = localStorage.getItem('shortcutLogo');
-        document.getElementById('customShortcutDiv').onclick = function() {openURL(localStorage.getItem('shortcutURL'))};
+    const customURL = localStorage.getItem('shortcutURL');
+    const customLogo = localStorage.getItem('shortcutLogo');
+    const customDiv = document.getElementById('customShortcutDiv');
+    
+    if (customURL && customLogo && customDiv) {
+        const icon = customDiv.querySelector('.shortcut-icon span');
+        if (icon) {
+            icon.textContent = customLogo;
+        }
+        customDiv.onclick = function() { openURL(customURL); };
     }
 }
 
-// sets the cloak
-function setCloak() {
-    const $cloakTitle = document.getElementById('cloakTitle');
-    const $cloakFavicon = document.getElementById('cloakFavicon');
-
-    if ($cloakTitle.value === '' && $cloakFavicon.value === '') {
-        alert('Cleared cloak');
-        localStorage.removeItem('cloakTitle');
-        localStorage.removeItem('cloakFavicon');
-    } else if ($cloakTitle.value === '' && $cloakFavicon.value != '') {
-        if ($cloakFavicon.value.match(/(https?:\/\/).*/gi)) {
-            localStorage.setItem('cloakFavicon', $cloakFavicon.value);
-        }
-    } else if ($cloakTitle.value != '' && $cloakFavicon.value === '') {
-        localStorage.setItem('cloakTitle', $cloakTitle.value);
-    } else {
-        localStorage.setItem('cloakTitle', $cloakTitle.value);
-        if ($cloakFavicon.value.match(/(https?:\/\/).*/gi)) {
-            localStorage.setItem('cloakFavicon', $cloakFavicon.value);
-        } else {
-            alert('Please enter a valid URL like: https://example.com/favicon.ico');
-        }
-    }
-    setupCloak();
-}
-
-// changes the text on the custom shortcut and changes the onclick function to open the shortcut url
+// Cloak functions
 function setupCloak() {
-    if (localStorage.getItem('cloakTitle') != null) {
-        document.title = localStorage.getItem('cloakTitle');
+    const cloakTitle = localStorage.getItem('cloakTitle');
+    const cloakFavicon = localStorage.getItem('cloakFavicon');
+    
+    if (cloakTitle) {
+        document.title = cloakTitle;
     }
-    if (localStorage.getItem('cloakFavicon') != null) {
-        changeFavicon(localStorage.getItem('cloakFavicon'));
-    }
-    if (localStorage.getItem('cloakTitle') == null && localStorage.getItem('cloakFavicon') == null) {
-        document.title = 'Elixir - Blazingly Fast Math Help!';
-        changeFavicon('favicon.ico');
+    if (cloakFavicon) {
+        changeFavicon(cloakFavicon);
     }
 }
 
-// changes the favicon
 function changeFavicon(src) {
-    var link = document.createElement('link'),
-        oldLink = document.getElementById('dynamic-favicon');
-    link.id = 'dynamic-favicon';
-    link.rel = 'shortcut icon';
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+    }
     link.href = src;
-    if (oldLink) {
-     document.head.removeChild(oldLink);
-    }
-    document.head.appendChild(link);
-   }
-   
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(window.location.origin + "/js/sw.js");
-  }
-
-// announcement code
-function announcement(text) {
-    document.getElementById("notification-text").innerHTML = text;
-    document.getElementById("announcement").style.display = "block";
 }
+navigator.serviceWorker.register(window.location.origin + "/js/sw.js");
 
-function fetchAnnouncement() {
-    fetch("./assets/announcement.json")
-    .then(response => response.json())
-    .then(data => {
-        // randonly selects an announcement
-        const announcementText = data.announcements.sort();
-        const randomAnnouncement = announcementText[Math.floor(Math.random() * announcementText.length)];
-        const importantAnnouncement = data['important'][0]
-        const superAnnouncement = data['super'][0]
-        if (superAnnouncement != null) {
-            announcement(superAnnouncement);
-        } else {
-            // randomly choose between important and normal announcement
-            const random = Math.floor(Math.random() * 2);
-            if (random === 0) {
-                announcement(randomAnnouncement);
-            } else {
-                announcement(importantAnnouncement);
-            }
-        }
-    });
-}
-
-function closeAnnouncement() {
-    document.getElementById("announcement").style.display = "none";
-    // dont show for 24 hours
-    localStorage.setItem('announcement', Date.now());
-}
-
-function showAnnouncement() {
-    // check if announcement has been shown in the last 24 hours
-    if (localStorage.getItem('announcement') != null) {
-        const lastShown = localStorage.getItem('announcement');
-        const now = Date.now();
-        const diff = now - lastShown;
-        const hours = Math.floor(diff / 1000 / 60 / 60);
-        if (hours > 2) {
-            fetchAnnouncement();
-        }
+// Notification system
+function showNotification(message) {
+    const notification = document.getElementById('notification');
+    const notificationText = document.getElementById('notification-text');
+    
+    if (notification && notificationText) {
+        notificationText.textContent = message;
+        notification.classList.remove('hidden');
+        
+        setTimeout(() => {
+            notification.classList.add('hidden');
+        }, 4000);
     } else {
-        fetchAnnouncement();
+        // Fallback to alert if notification system not available
+        alert(message);
     }
 }
 
-showAnnouncement();
+function closeNotification() {
+    const notification = document.getElementById('notification');
+    if (notification) {
+        notification.classList.add('hidden');
+    }
+}
 
-// end of announcement code
+// Announcement system
+function showAnnouncement() {
+    // Simple welcome message instead of fetching from file
+    setTimeout(() => {
+        showNotification('Welcome to Free☀️, enjoy the browsing.');
+    }, 1000);
+}
+
+// Make functions globally available
+window.openURL = openURL;
+window.openPage = openPage;
+window.setActiveNav = setActiveNav;
+window.checkPassword = checkPassword;
+window.setPassword = setPassword;
+window.setSearchEngine = setSearchEngine;
+window.setAboutBlank = setAboutBlank;
+window.setAnalytics = setAnalytics;
+window.setCustomShortcut = setCustomShortcut;
+window.closeNotification = closeNotification;

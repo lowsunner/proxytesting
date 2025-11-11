@@ -929,9 +929,8 @@
         }
       }
       async function registerSW() {
-  // if ('serviceWorker' in navigator) {
+ 
     navigator.serviceWorker.register(window.location.origin + "/static/public/js/sw.js");
-//  }
 }
       // Search function - same as original
       function search(engine, query) {

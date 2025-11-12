@@ -15,46 +15,49 @@ function xorDecode(str) {
 }
 
 export async function onRequest(context) {
-    const { request } = context;
-    const url = new URL(request.url);
-    const encoded = url.searchParams.get("url");
+  const { request } = context;
+  const url = new URL(request.url);
+  const encoded = url.searchParams.get('url');
 
-    if (!encoded) {
-        return new Response("No URL specified", { status: 400 });
+  if (!encoded) {
+    return new Response('No URL specified', { status: 400 });
+  }
+
+  let decoded;
+  try {
+    decoded = Ultraviolet.codec.xor.decode(encoded);
+  } catch (err) {
+    return new Response('Invalid encoded URL', { status: 400 });
+  }
+
+  // Ensure URL has proper scheme
+  if (!decoded.startsWith('http://') && !decoded.startsWith('https://')) {
+    decoded = 'https://' + decoded;
+  }
+
+  // Fetch the target URL
+  try {
+    const res = await fetch(decoded, {
+      headers: request.headers,
+      method: request.method,
+      body: request.body
+    });
+
+    if (!res) {
+      return new Response('Fetch failed: empty response', { status: 502 });
     }
 
-    let decoded;
-    try {
-        decoded = xorDecode(encoded);
-    } catch (err) {
-        return new Response("Invalid encoded URL", { status: 400 });
-    }
+    const body = await res.arrayBuffer();
+    const responseHeaders = new Headers(res.headers);
 
-    // Validate decoded URL
-    if (!/^https?:\/\//.test(decoded)) {
-        return new Response("Decoded URL is not valid: " + decoded, { status: 400 });
-    }
+    // Make sure status is valid
+    const status = res.status >= 200 && res.status <= 599 ? res.status : 502;
 
-    // Fetch target URL
-    try {
-        const res = await fetch(decoded, {
-            headers: request.headers,
-            method: request.method,
-            body: request.body
-        });
-
-        // Return response as-is
-        const body = await res.arrayBuffer();
-        const responseHeaders = new Headers(res.headers);
-
-        // Force CORS headers if needed
-        responseHeaders.set("Access-Control-Allow-Origin", "*");
-
-        return new Response(body, {
-            status: res.status,
-            headers: responseHeaders
-        });
-    } catch (err) {
-        return new Response("Proxy fetch failed: " + err.message, { status: 502 });
-    }
+    return new Response(body, {
+      status,
+      headers: responseHeaders
+    });
+  } catch (err) {
+    return new Response('Proxy fetch failed: ' + err.message, { status: 502 });
+  }
 }

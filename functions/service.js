@@ -1,19 +1,13 @@
 // service.js
-// Cloudflare Pages Function to proxy requests using UV decoding
 
-// Inline the exact UV XOR decode function
-function xorDecode(str) {
-    if (!str) return str;
-    // Split URL from query if present
-    const [path, ...rest] = str.split("?");
-    const query = rest.length ? "?" + rest.join("?") : "";
-    // Decode URI component
-    return decodeURIComponent(path)
-        .split("")
-        .map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ (i & 255)))
-        .join("") + query;
-}
+// Import UV bundle (adjust path if needed; on Pages, this will resolve in /static/public)
+importScripts('./static/public/js/uv/uv.bundle.js');
+importScripts('./static/public/js/uv/uv.config.js');
+importScripts('./static/public/js/uv/uv.sw.js');
 
+const sw = new UVServiceWorker();
+
+// Cloudflare Pages Functions style
 export async function onRequest(context) {
   const { request } = context;
   const url = new URL(request.url);
@@ -25,39 +19,44 @@ export async function onRequest(context) {
 
   let decoded;
   try {
-    decoded = Ultraviolet.codec.xor.decode(encoded);
+    // ✅ Use the exact UV decode function
+    decoded = __uv$config.decodeUrl(encoded);
   } catch (err) {
     return new Response('Invalid encoded URL', { status: 400 });
   }
 
-  // Ensure URL has proper scheme
-  if (!decoded.startsWith('http://') && !decoded.startsWith('https://')) {
-    decoded = 'https://' + decoded;
+  // Validate URL
+  try {
+    const targetURL = new URL(decoded);
+  } catch {
+    return new Response('Decoded URL is not valid', { status: 400 });
   }
 
-  // Fetch the target URL
   try {
+    // Fetch the target URL exactly as UV does
     const res = await fetch(decoded, {
       headers: request.headers,
       method: request.method,
-      body: request.body
+      body: request.body,
+      redirect: 'manual', // UV handles redirects itself
     });
 
-    if (!res) {
-      return new Response('Fetch failed: empty response', { status: 502 });
-    }
-
     const body = await res.arrayBuffer();
-    const responseHeaders = new Headers(res.headers);
+    const headers = new Headers(res.headers);
 
-    // Make sure status is valid
-    const status = res.status >= 200 && res.status <= 599 ? res.status : 502;
+    // Remove unsafe headers for the browser
+    headers.delete('content-encoding');
+    headers.delete('content-length');
 
     return new Response(body, {
-      status,
-      headers: responseHeaders
+      status: res.status,
+      statusText: res.statusText,
+      headers,
     });
   } catch (err) {
     return new Response('Proxy fetch failed: ' + err.message, { status: 502 });
   }
 }
+
+// Optional: fallback SW for client-side fetch interception
+self.addEventListener('fetch', (event) => event.respondWith(sw.fetch(event)));

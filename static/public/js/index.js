@@ -107,22 +107,21 @@ function isUrl(val = "") {
     return false;
 }
 
-// open url function - use the EXACT working version from old index.js
+// Open URL through Cloudflare Function
 function openURL(url) {
-  if (!isUrl(url)) url = getSearchEngineURL() + url;
-  else if (!(url.startsWith("https://") || url.startsWith("http://")))
-    url = "http://" + url;
+    if (!isUrl(url)) url = getSearchEngineURL() + url;
+    else if (!(url.startsWith("https://") || url.startsWith("http://")))
+        url = "http://" + url;
 
-  const encodedUrl = __uv$config.encodeUrl(url);
-
-  // Call the Cloudflare function
-  window.location.href = `/api/service?url=${encodedUrl}`;
+    if (getAboutBlank() === 'on') {
+        openAboutBlank(window.location.href.slice(0, -1) + `/service?url=${encodeURIComponent(url)}`);
+    } else {
+        // Redirect through Cloudflare Function
+        window.location.href = `/service?url=${encodeURIComponent(url)}`;
+    }
 }
 
-
-
-// Search function
-// Search function - use the EXACT working version from old index.js
+// Perform search through Cloudflare Function
 function performSearch(engine, query) {
     let searchURL;
     switch(engine) {
@@ -142,11 +141,14 @@ function performSearch(engine, query) {
             searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
     }
 
-    const encoded = __uv$config.encodeUrl(searchURL);
-
-    // Redirect via Cloudflare Function
-    window.location.href = '/service?url=' + encoded;
+    if (getAboutBlank() === 'on') {
+        openAboutBlank(window.location.href.slice(0, -1) + `/service?url=${encodeURIComponent(searchURL)}`);
+    } else {
+        // Redirect through Cloudflare Function
+        window.location.href = `/service?url=${encodeURIComponent(searchURL)}`;
+    }
 }
+
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register(window.location.origin + "/js/sw.js");

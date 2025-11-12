@@ -113,14 +113,13 @@ function openURL(url) {
     else if (!(url.startsWith("https://") || url.startsWith("http://")))
         url = "http://" + url;
 
-    const encoded = __uv$config.encodeUrl(url); // Proper UV XOR encoding
+    // ✅ Use UV encode for the query param
+    const target = __uv$config.encodeUrl(url);
 
-    if (getAboutBlank() === 'on') {
-        openAboutBlank(window.location.origin + __uv$config.prefix + encoded);
-    } else {
-        window.location.href = __uv$config.prefix + encoded;
-    }
+    // Send it to the function
+    window.location.href = `/service?url=${encodeURIComponent(target)}`;
 }
+
 
 function performSearch(engine, query) {
     let searchURL;

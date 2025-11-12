@@ -113,15 +113,15 @@ function openURL(url) {
     else if (!(url.startsWith("https://") || url.startsWith("http://")))
         url = "http://" + url;
 
+    const encoded = __uv$config.encodeUrl(url); // Proper UV XOR encoding
+
     if (getAboutBlank() === 'on') {
-        openAboutBlank(window.location.href.slice(0, -1) + `/service?url=${encodeURIComponent(url)}`);
+        openAboutBlank(window.location.origin + __uv$config.prefix + encoded);
     } else {
-        // Redirect through Cloudflare Function
-        window.location.href = `/service?url=${encodeURIComponent(url)}`;
+        window.location.href = __uv$config.prefix + encoded;
     }
 }
 
-// Perform search through Cloudflare Function
 function performSearch(engine, query) {
     let searchURL;
     switch(engine) {
@@ -141,11 +141,12 @@ function performSearch(engine, query) {
             searchURL = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
     }
 
+    const encoded = __uv$config.encodeUrl(searchURL); // Proper UV XOR encoding
+
     if (getAboutBlank() === 'on') {
-        openAboutBlank(window.location.href.slice(0, -1) + `/service?url=${encodeURIComponent(searchURL)}`);
+        openAboutBlank(window.location.origin + __uv$config.prefix + encoded);
     } else {
-        // Redirect through Cloudflare Function
-        window.location.href = `/service?url=${encodeURIComponent(searchURL)}`;
+        window.location.href = __uv$config.prefix + encoded;
     }
 }
 

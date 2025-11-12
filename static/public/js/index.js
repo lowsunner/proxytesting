@@ -109,17 +109,16 @@ function isUrl(val = "") {
 
 // open url function - use the EXACT working version from old index.js
 function openURL(url) {
-    // Make sure it’s a full URL
-    if (!isUrl(url)) url = getSearchEngineURL() + url;
-    else if (!(url.startsWith("https://") || url.startsWith("http://")))
-        url = "http://" + url;
+  if (!isUrl(url)) url = getSearchEngineURL() + url;
+  else if (!(url.startsWith("https://") || url.startsWith("http://")))
+    url = "http://" + url;
 
-    // Encode URL using UV encode function
-    const encoded = __uv$config.encodeUrl(url);
+  const encodedUrl = __uv$config.encodeUrl(url);
 
-    // Redirect to Cloudflare Function
-    window.location.href = '/service?url=' + encoded;
+  // Call the Cloudflare function
+  window.location.href = `/api/service?url=${encodedUrl}`;
 }
+
 
 
 // Search function
